@@ -22,21 +22,27 @@ jobs:
       runner_mode: repo_owned
       runner_labels_json: ${{ vars.PRIMARY_LINUX_RUNNER_LABELS_JSON }}
       workspace_mode: isolated
-      # The shared package template defaults publication on. Its required
-      # negative sentinel keeps this invocation validation-only; no provider
-      # coordinate is supplied.
+      # Validation only (RU8: the Bazel module is the sole delivery path; no
+      # npm or GitHub Packages publication). The shared package template
+      # defaults publication on; this negative sentinel keeps the invocation
+      # validation-only and no provider coordinate is supplied.
       npm_publish_mode: disabled
-      node_versions: '["20", "22"]'
-      pnpm_version: "9.15.9"
-      prepare_command: pnpm exec svelte-kit sync
+      dry_run: true
+      node_versions: '["22"]'
+      publish_node_version: "22"
+      pnpm_version: "10.13.1"
       metadata_check_command: pnpm check:release-metadata
       lint_command: pnpm lint
-      typecheck_command: pnpm check
-      unit_test_command: pnpm test:unit
+      # @tummycrypt/tinyland-calendar and -caldav-client resolve only through
+      # the Bazel module graph, so type checks, tests and the package build run
+      # through Bazel. //:typecheck is svelte-check --tsgo on TypeScript 7.0.2
+      # plus its seeded-error canary (a test_suite, so it is run with `test`).
+      typecheck_command: "npx --yes @bazel/bazelisk test //:typecheck --config=ci"
+      unit_test_command: "npx --yes @bazel/bazelisk test //:test //:test-component --config=ci"
       integration_test_command: pnpm test:integration
-      build_command: pnpm build
-      package_check_command: pnpm check:package
-      bazel_targets: "//:typecheck //:pkg //:test"
+      build_command: "npx --yes @bazel/bazelisk build //:pkg --config=ci"
+      package_check_command: "npx --yes @bazel/bazelisk build //:pkg --config=ci && npx --yes publint@0.3.25 ./bazel-bin/pkg"
+      bazel_targets: "//:pkg //:typecheck //:test //:test-component"
       # Cache-first shared-cache-backed Bazel validation (TIN-2110 pilot).
       # Routes the Bazel validation through the fail-closed cache-attachment
       # contract + --config=ci-cached --remote_cache=$BAZEL_REMOTE_CACHE
@@ -65,12 +71,11 @@ jobs:
       - uses: xoxd-ai/ci-templates/.github/actions/nix-setup@v3.2.1
       - uses: pnpm/action-setup@v4
         with:
-          version: "9.15.9"
+          version: "10.13.1"
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
       - run: pnpm install --frozen-lockfile
-      - run: pnpm exec svelte-kit sync
       - name: Run integration proof with pinned PostgreSQL
         shell: bash
         run: |

@@ -3,7 +3,7 @@
 	"schema_version": 1,
 	"repo": {
 		"name": "scheduling-kit",
-		"github": "Jesssullivan/scheduling-kit",
+		"github": "xoxd-ai/scheduling-kit",
 		"description": "Backend-agnostic, headless scheduling library with pluggable adapters, payment processors, and Svelte UI; delivered through Bzlmod from the Bazel //:pkg artifact.",
 		"linear": {
 			"initiative": "TIN-89",
@@ -34,9 +34,9 @@
 		"owns_bazel_module_authority": true
 	},
 	"authorities": {
-		"ci_templates": "tinyland-inc/ci-templates",
-		"cache_rbe_authority": "tinyland-inc/GloriousFlywheel",
-		"package_registry": "tinyland-inc/bazel-registry"
+		"ci_templates": "xoxd-ai/ci-templates",
+		"cache_rbe_authority": "xoxd-ai/GloriousFlywheel",
+		"package_registry": "xoxd-ai/bazel-registry"
 	},
 	"enrollment": {
 		"forgeScope": "Jesssullivan",

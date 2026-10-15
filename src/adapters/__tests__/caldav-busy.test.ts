@@ -317,7 +317,7 @@ describe('loadCalDavClient — optional peer @tummycrypt/tinyland-caldav-client'
       code: 'CALDAV_PEER_UNAVAILABLE',
     });
     expect((error as Error).message).toMatch(
-      /pnpm add @tummycrypt\/tinyland-caldav-client/,
+      /bazel_dep\(name = "tummycrypt_tinyland_caldav_client"\)/,
     );
     expect((error as Error).message).toMatch(/Cause: /);
   });

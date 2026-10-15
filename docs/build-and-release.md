@@ -45,7 +45,7 @@ Package delivery follows one source of truth:
 
 1. The Bzlmod module graph is the canonical (SSOT) delivery mechanism.
    Consumers depend on `tummycrypt_scheduling_kit` through the
-   `tinyland-inc/bazel-registry` registry line already present in `.bazelrc`.
+   `xoxd-ai/bazel-registry` registry line already present in `.bazelrc`.
 2. The source tag and GitHub Release identify the immutable source archive;
    they do not create a second consumer route.
 3. `@tummycrypt/scheduling-kit` is the JavaScript import identity inside the
@@ -99,7 +99,7 @@ Before cutting a package release, verify these surfaces together:
 - exact version identity across `package.json`, `MODULE.bazel`, and `BUILD.bazel`
 - GF validation of `//:pkg` and the real-PostgreSQL concurrency proof
 - source tag and GitHub Release resolving to the intended signed commit
-- append-only Bazel registry entry in `tinyland-inc/bazel-registry`
+- append-only Bazel registry entry in `xoxd-ai/bazel-registry`
 - isolated BCR consumer proof for the new module version
 - consumer Bzlmod version in bridge and app repositories
 
