@@ -33,7 +33,7 @@ This repo intentionally keeps two build surfaces:
 
 The local flake and `.envrc` exist to provision those tools consistently on a
 fresh machine. They do not replace Bazel or become a second package authority.
-The Bzlmod graph through `tinyland-inc/bazel-registry` is the sole delivery
+The Bzlmod graph through `xoxd-ai/bazel-registry` is the sole delivery
 path; provider package registries are not current consumer routes.
 
 ## Where to go next

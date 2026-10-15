@@ -8,7 +8,7 @@ This file is the operating brief for AI agents and LLMs working in `@tummycrypt/
 TIN-1997 Option D; pilot tracked as TIN-2110).
 
 - **Do NOT** create runners or a bespoke cache instance. Route everything through
-  the shared `tinyland-inc/ci-templates` surface and the existing GloriousFlywheel
+  the shared `xoxd-ai/ci-templates` surface and the existing GloriousFlywheel
   substrate.
 - **Do NOT** run raw `bazel build` as validation enrollment. A green build on the
   `tinyland-nix` runner with only `--disk_cache` is **NOT** cache-backed and is
@@ -91,13 +91,12 @@ Closed but still relevant context:
 
 Current operational truth:
 
-- local development should default to `jesssullivan/main`
-- that branch is the current functional release line
-- current released version is `tummycrypt_scheduling_kit@0.11.1`: source commit
-  and lightweight tag `9a00ee387afe1759ebba0c0a67e9246d84b1aa37`,
-  GitHub Release `v0.11.1`, and append-only registry receipt
-  `cfbb16e6ae957da9e8a25b7418a7871ec815e0a1`
-- the Bzlmod module graph through `tinyland-inc/bazel-registry` is the sole
+- source authority is `xoxd-ai/scheduling-kit` `main` (`Jesssullivan/scheduling-kit`
+  and `tinyland-inc/scheduling-kit` redirect here)
+- 1.0.0 (RU1/RU6/RU8/RU10 uplift, 2026-10-15) is released as a signed tag
+  `v1.0.0`, a GitHub Release and an `xoxd-ai/bazel-registry` entry; see
+  CHANGELOG.md for the migration note
+- the Bzlmod module graph through `xoxd-ai/bazel-registry` is the sole
   delivery authority; npmjs and GitHub Packages are historical surfaces, not
   release gates, consumer aliases, or evidence for current versions
 - HomegrownAdapter does not require `tinyland-auth-pg`; schemas are injected
@@ -106,8 +105,6 @@ Current operational truth:
 - `#73` remains open only for explicit historical release-surface
   backfill/documentation around older `0.7.1` / `0.7.2` gaps; it cannot make a
   provider package a current delivery authority
-- `tinyland-inc/origin/main` is now a downstream mirror/validation surface,
-  not an equally authoritative release surface
 - source metadata, git tags, GitHub Releases, and append-only BCR entries are
   distinct evidence; only the registry entry delivers a current module
 
@@ -116,7 +113,9 @@ Current operational truth:
 There are **two** build surfaces in this repo:
 
 1. `pnpm` remains the package-manager and script interface for local work
-2. Bazel defines and builds the JavaScript package artifact validated by CI
+2. Bazel defines, builds, tests and type-checks the JavaScript package artifact;
+   it is the proof authority, because in-house modules (tinyland-calendar,
+   tinyland-caldav-client) resolve only through the Bazel module graph
 
 Do not confuse them.
 
@@ -129,17 +128,13 @@ authority.
 Today, the functional validation path is driven by:
 
 - the shared `js-bazel-package` GitHub Actions workflow
-- metadata, typecheck, lint, test, and build commands invoked through pnpm
+- metadata and lint through pnpm; typecheck (`bazel test //:typecheck`, svelte-check
+  `--tsgo` on TypeScript 7.0.2), unit/component tests and the package build through Bazel
 - Bazel targets including `//:pkg`
 - package output from `./bazel-bin/pkg`
 - GF validation only; this repo has no package-publication workflow
 
-And, right now, the functional release repo is:
-
-- `Jesssullivan/scheduling-kit`
-
-Do not silently assume the `tinyland-inc` remote is equivalent just because it
-still exists.
+The release repo is `xoxd-ai/scheduling-kit`.
 
 ### Bazel role
 
@@ -155,7 +150,7 @@ Current target state:
 1. release metadata declared once
 2. Bazel validates/builds the package artifact
 3. GF CI validates and archives that artifact as build evidence
-4. an append-only `tinyland-inc/bazel-registry` entry delivers the module
+4. an append-only `xoxd-ai/bazel-registry` entry delivers the module
 5. downstream apps consume the ruled Bzlmod version
 
 ## Bazel Guardrails
@@ -197,7 +192,7 @@ bar.
 
 Delivery doctrine:
 
-- the Bzlmod module graph through `tinyland-inc/bazel-registry` is the SSOT
+- the Bzlmod module graph through `xoxd-ai/bazel-registry` is the SSOT
   delivery mechanism
 - the source tag and GitHub Release identify the archive; neither replaces the
   registry entry or the GF consumer proof
@@ -211,7 +206,7 @@ needed. Do not split package truth across both remotes by accident.
 
 Current runner truth:
 
-- CI uses the shared `tinyland-inc/ci-templates` package validator and the
+- CI uses the shared `xoxd-ai/ci-templates` package validator and the
   existing GF capability labels; no hosted-runner exception is allowed
 - do not describe the runner lane as fully proven until repo Actions runner
   visibility and green workflow runs confirm it

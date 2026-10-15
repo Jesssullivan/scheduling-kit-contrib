@@ -452,7 +452,7 @@ describe('expandRecurrence — optional peer @tummycrypt/tinyland-calendar', () 
       code: 'RECURRENCE_PEER_UNAVAILABLE',
     });
     expect((error as Error).message).toMatch(
-      /pnpm add @tummycrypt\/tinyland-calendar/,
+      /bazel_dep\(name = "tummycrypt_tinyland_calendar"\)/,
     );
     // Original import failure is preserved (vitest wraps the mock error).
     expect((error as Error).message).toMatch(/Cause: /);

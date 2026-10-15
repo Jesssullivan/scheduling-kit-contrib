@@ -45,7 +45,7 @@
  *   transition may over/under-shoot local midnight by the DST offset.
  *
  * Known upstream gap (documented in the TIN-1996 design spike): at
- * caldav-client 0.2.3, `package.json` omits its `@tummycrypt/tinyland-calendar`
+ * caldav-client 0.2.3, `package.json` omitted its `@tummycrypt/tinyland-calendar`
  * type dependency, so kit depends on tinyland-calendar directly rather than
  * relying on transitive resolution. Additionally, whether `queryEvents`'
  * server-side time-range filter matches *recurring masters* that started
@@ -114,9 +114,11 @@ export class CalDavPeerUnavailableError extends Error {
     const message = cause instanceof Error ? cause.message : String(cause);
     super(
       'loadCalDavClient requires the optional peer dependency ' +
-        '@tummycrypt/tinyland-caldav-client (^0.2.3). Install it alongside ' +
+        '@tummycrypt/tinyland-caldav-client (>= 1.0.1). Link it alongside ' +
         '@tummycrypt/scheduling-kit to use the ./caldav subpath ' +
-        `(e.g. \`pnpm add @tummycrypt/tinyland-caldav-client\`). Cause: ${message}`,
+        '(Bazel only: `bazel_dep(name = "tummycrypt_tinyland_caldav_client")` plus ' +
+        '`npm_link_package(name = "node_modules/@tummycrypt/tinyland-caldav-client", ' +
+        `src = "@tummycrypt_tinyland_caldav_client//:pkg")\`). Cause: ${message}`,
     );
     this.name = 'CalDavPeerUnavailableError';
   }

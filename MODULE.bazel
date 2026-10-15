@@ -5,25 +5,22 @@ Backend-agnostic scheduling library with pluggable adapters, payment processors,
 and Svelte UI components. The JavaScript artifact keeps the
 @tummycrypt/scheduling-kit import identity for Bazel consumers.
 
-Bzlmod-native configuration for Bazel 8+.
-CI invokes pnpm tooling but validates the hermetic Bazel build graph on GF.
+Bazel is the only distribution path (RU6): consumers take this module from
+xoxd-ai/bazel-registry and link the package; nothing is published to npm.
+
+  bazel_dep(name = "tummycrypt_scheduling_kit", version = "1.0.0")
+  npm_link_package(name = "node_modules/@tummycrypt/scheduling-kit", src = "@tummycrypt_scheduling_kit//:pkg")
 
 Build targets:
-  bazel build //:scheduling_kit       # Svelte package build (dist/)
-  bazel build //:pkg                  # JavaScript package artifact
+  bazel build //:pkg                  # JavaScript package artifact (svelte-package dist/)
   bazel test //:test                  # Unit tests (vitest)
-  bazel build //:typecheck            # Type validation (svelte-check)
-
-Subpackage targets (finer-grained caching):
-  bazel build //src/core:core         # Types, adapter interface, Effect wrappers
-  bazel build //src/adapters:adapters # HomegrownAdapter (PostgreSQL/Drizzle)
-  bazel build //src/payments:payments # Stripe, Venmo, manual adapters
-  bazel build //src/components:components  # Svelte checkout UI
+  bazel test //:test-component        # Rendered Svelte component tests (jsdom)
+  bazel test //:typecheck             # svelte-check --tsgo (TypeScript 7.0.2) + seeded-error canary
 """
 
 module(
     name = "tummycrypt_scheduling_kit",
-    version = "0.12.0",
+    version = "1.0.0",
     compatibility_level = 1,
 )
 
@@ -36,81 +33,62 @@ bazel_dep(name = "platforms", version = "1.0.0")
 bazel_dep(name = "aspect_bazel_lib", version = "2.22.5")
 
 # =============================================================================
-# Inter-module dependencies (tinyland-inc/bazel-registry)
+# Inter-module dependencies (xoxd-ai/bazel-registry)
 # =============================================================================
-# Availability substrate (TIN-1996): kit consumes tinyland-calendar (RRULE
-# recurrence) and tinyland-caldav-client (external calendar busy overlay)
-# through the Bzlmod graph. That graph is the sole first-party delivery
-# authority. package.json and the pnpm lock still carry JavaScript dependencies
-# needed to compile this source tree through npm_translate_lock; they are build
-# inputs, not a parallel first-party registry or a parity authority.
+# Availability substrate (TIN-1996): the ./recurrence and ./caldav subpaths load
+# tinyland-calendar (RRULE recurrence) and tinyland-caldav-client (external
+# calendar busy overlay) lazily at runtime. Both come only from the Bzlmod graph
+# (RU6): BUILD.bazel links each module's //:pkg into node_modules for the
+# package build, the type check and the tests. package.json and the pnpm lock
+# carry no in-house specifiers.
 
-bazel_dep(name = "tummycrypt_tinyland_calendar", version = "0.2.3")
-bazel_dep(name = "tummycrypt_tinyland_caldav_client", version = "0.2.3")
+bazel_dep(name = "tummycrypt_tinyland_calendar", version = "1.0.0")
+bazel_dep(name = "tummycrypt_tinyland_caldav_client", version = "1.0.1")
 
 # =============================================================================
-# JavaScript / TypeScript toolchain (Aspect Build)
+# JavaScript toolchain (Aspect Build)
 # =============================================================================
 
 bazel_dep(name = "rules_nodejs", version = "6.7.3")
 bazel_dep(name = "aspect_rules_js", version = "2.9.1")
-bazel_dep(name = "aspect_rules_ts", version = "3.8.4")
-bazel_dep(name = "aspect_rules_swc", version = "2.6.1")
 
 # =============================================================================
 # Node.js toolchain
 # =============================================================================
 
-node = use_extension("@rules_nodejs//nodejs:extensions.bzl", "node")
-node.toolchain(node_version = "22.13.1")
+node = use_extension("@rules_nodejs//nodejs:extensions.bzl", "node", dev_dependency = True)
+node.toolchain(node_version = "22.22.0")
 
 # =============================================================================
 # pnpm toolchain
 # =============================================================================
 
-pnpm = use_extension("@aspect_rules_js//npm:extensions.bzl", "pnpm")
+pnpm = use_extension("@aspect_rules_js//npm:extensions.bzl", "pnpm", dev_dependency = True)
 pnpm.pnpm(
     name = "pnpm",
-    pnpm_version = "9.15.9",
+    pnpm_version = "10.13.1",
 )
 use_repo(pnpm, "pnpm")
 
 # =============================================================================
 # npm dependency resolution from pnpm-lock.yaml
 # =============================================================================
+# Not dev: a consumer's build of //:pkg runs svelte-package from this lock.
+# RU13: npm_translate_lock applies the pnpm `patchedDependencies` recorded in
+# pnpm-lock.yaml, and the RU13b companion rewrite from .pnpmfile.cjs is recorded
+# there too; the hook and patch files are declared inputs.
 
 npm = use_extension("@aspect_rules_js//npm:extensions.bzl", "npm")
 
 npm.npm_translate_lock(
     name = "tummycrypt_scheduling_kit_npm",
-    pnpm_lock = "//:pnpm-lock.yaml",
-    data = ["//:package.json"],
+    data = [
+        "//:.pnpmfile.cjs",
+        "//:package.json",
+        "//:patches/svelte-check@4.7.6.patch",
+    ],
     npmrc = "//:.npmrc",
+    pnpm_lock = "//:pnpm-lock.yaml",
 )
 
 use_repo(npm, "tummycrypt_scheduling_kit_npm")
-
-# =============================================================================
-# TypeScript toolchain
-# =============================================================================
-
-rules_ts_ext = use_extension("@aspect_rules_ts//ts:extensions.bzl", "ext")
-
-rules_ts_ext.deps(
-    ts_version = "5.9.3",
-)
-
-use_repo(rules_ts_ext, "npm_typescript")
-
-# =============================================================================
-# SWC toolchain (fast transpilation)
-# =============================================================================
-
-swc = use_extension("@aspect_rules_swc//swc:extensions.bzl", "swc")
-swc.toolchain(
-    name = "swc",
-    swc_version = "v1.10.12",
-)
-use_repo(swc, "swc_toolchains")
-
-register_toolchains("@swc_toolchains//:all")

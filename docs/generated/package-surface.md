@@ -11,10 +11,10 @@ Generated from `package.json` and the current `src/` tree.
 | Field | Value |
 | --- | --- |
 | Package | `@tummycrypt/scheduling-kit` |
-| Version | `0.11.1` |
+| Version | `1.0.0` |
 | Description | Backend-agnostic scheduling components with alternative payment support |
-| Node range | `>=20 <25` |
-| Repository | https://github.com/Jesssullivan/scheduling-kit.git |
+| Node range | `^22.17.0 \|\| >=24 <25` |
+| Repository | https://github.com/xoxd-ai/scheduling-kit.git |
 
 ## Export Map
 
@@ -52,14 +52,14 @@ Generated from `package.json` and the current `src/` tree.
 | `src/reconciliation` | 4 | Alternative-payment matching and webhook helpers |
 | `src/stores` | 2 | Svelte runes-based state |
 | `src/testing` | 5 | Cassette recording, replay, and masking utilities |
-| `src/tests` | 42 | Vitest helpers, mocks, fixtures, and unit coverage |
+| `src/tests` | 41 | Vitest helpers, mocks, fixtures, and unit coverage |
 
 ## Script Entry Points
 
 | Script | Command |
 | --- | --- |
-| `build` | `svelte-kit sync && svelte-package` |
-| `check` | `svelte-kit sync && svelte-check --tsconfig ./tsconfig.json` |
+| `build` | `svelte-package -i src` |
+| `check` | `svelte-check --tsgo --tsconfig ./tsconfig.json` |
 | `check:release-metadata` | `node scripts/check-release-metadata.mjs` |
 | `docs:check` | `pnpm docs:generate --check && mkdocs build --strict` |
 | `docs:generate` | `node scripts/generate-doc-artifacts.mjs` |

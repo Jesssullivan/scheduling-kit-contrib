@@ -1,16 +1,11 @@
-import adapter from '@sveltejs/adapter-auto';
-import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
+// Svelte config for svelte-package, svelte-check and Vitest. This is a library:
+// there is no SvelteKit app, adapter or `svelte-kit sync` step (1.0.0 dropped the
+// Kit dev dependency). svelte-package is invoked with `-i src` explicitly.
+import { vitePreprocess } from "@sveltejs/vite-plugin-svelte";
 
-/** @type {import('@sveltejs/kit').Config} */
+/** @type {import("svelte/compiler").CompileOptions & { preprocess?: unknown }} */
 const config = {
   preprocess: vitePreprocess(),
-
-  kit: {
-    adapter: adapter(),
-    files: {
-      lib: 'src',
-    },
-  },
 };
 
 export default config;

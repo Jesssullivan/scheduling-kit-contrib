@@ -11,27 +11,27 @@ Generated from `package.json`, `MODULE.bazel`, `BUILD.bazel`,
 
 | Surface | Value |
 | --- | --- |
-| package.json version | `0.11.1` |
-| MODULE.bazel version | `0.11.1` |
-| BUILD.bazel JS package version | `0.11.1` |
+| package.json version | `1.0.0` |
+| MODULE.bazel version | `1.0.0` |
+| BUILD.bazel JS package version | `1.0.0` |
 | BUILD.bazel JS package name | `@tummycrypt/scheduling-kit` |
 | .bazelversion | `8.1.1` |
-| pnpm packageManager | `pnpm@9.15.9` |
-| MODULE.bazel pnpm version | `9.15.9` |
+| pnpm packageManager | `pnpm@10.13.1` |
+| MODULE.bazel pnpm version | `10.13.1` |
 
 ## Delivery And Validation Inputs
 
 | Field | Value |
 | --- | --- |
 | Bzlmod module | `tummycrypt_scheduling_kit` |
-| Bazel registry | https://raw.githubusercontent.com/tinyland-inc/bazel-registry/main |
-| Source repository | https://github.com/Jesssullivan/scheduling-kit.git |
+| Bazel registry | https://raw.githubusercontent.com/xoxd-ai/bazel-registry/aedc47769da5e367432afe8355177b0a87960468 |
+| Source repository | https://github.com/xoxd-ai/scheduling-kit.git |
 | CI purpose | GF validation only |
 | CI template | `xoxd-ai/ci-templates@v3.2.1` |
 | CI runner mode | `repo_owned` |
 | CI runner labels | `${{ vars.PRIMARY_LINUX_RUNNER_LABELS_JSON }}` |
-| CI node versions | `["20", "22"]` |
-| Bazel targets | `//:typecheck //:pkg //:test` |
+| CI node versions | `["22"]` |
+| Bazel targets | `//:pkg //:typecheck //:test //:test-component` |
 | Bazel artifact dir | `./bazel-bin/pkg` |
 
 ## Validation Commands

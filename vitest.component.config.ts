@@ -8,7 +8,6 @@ import { svelte } from '@sveltejs/vite-plugin-svelte';
 export default defineConfig({
   plugins: [
     svelte({
-      hot: !process.env.VITEST,
       compilerOptions: {
         // Don't generate CSS - avoids preprocessing issues in jsdom
         css: 'external',
@@ -34,5 +33,15 @@ export default defineConfig({
   },
   resolve: {
     conditions: ['browser'],
+  },
+  // jsdom tests run in Vite's web transform mode, which serves modules through
+  // /@fs/ and enforces server.fs.allow. Under Bazel the runfiles tree is a
+  // symlink farm and Vite resolves setup files to their real path in the
+  // output tree, outside the runfiles root, so strict fs serving rejects them
+  // (ERR_MODULE_NOT_FOUND). Test-only config; no dev server is exposed.
+  server: {
+    fs: {
+      strict: false,
+    },
   },
 });

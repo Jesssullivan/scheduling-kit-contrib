@@ -26,7 +26,7 @@ const moduleVersion = extract(moduleBazel, /module\([\s\S]*?version = "([^"]+)"/
 const buildVersion = extract(buildBazel, /npm_package\([\s\S]*?version = "([^"]+)"/m, 'BUILD.bazel npm_package version');
 const buildPackageName = extract(buildBazel, /npm_package\([\s\S]*?package = "([^"]+)"/m, 'BUILD.bazel package name');
 const modulePnpmVersion = extract(moduleBazel, /pnpm_version = "([^"]+)"/, 'MODULE.bazel pnpm version');
-const registryUrl = extract(bazelRc, /common --registry=(https:\/\/raw\.githubusercontent\.com\/tinyland-inc\/bazel-registry\/[^\s]+)/, 'Bazel registry URL');
+const registryUrl = extract(bazelRc, /common --registry=(https:\/\/raw\.githubusercontent\.com\/xoxd-ai\/bazel-registry\/[^\s]+)/, 'Bazel registry URL');
 const ciNodeVersions = extract(ciWorkflow, /node_versions:\s*'([^']+)'/, 'CI node versions');
 const ciBazelTargets = extract(ciWorkflow, /bazel_targets:\s*"([^"]+)"/, 'CI bazel targets');
 const ciPackageDir = extract(ciWorkflow, /package_dir:\s*([^\n]+)/, 'CI package dir');

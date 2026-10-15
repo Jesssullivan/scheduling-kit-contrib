@@ -1,31 +1,22 @@
 """
 BUILD.bazel for @tummycrypt/scheduling-kit.
 
-Two build interfaces: pnpm exposes repository scripts; Bazel owns the hermetic graph.
-  Standalone: pnpm build            (svelte-kit sync && svelte-package)
-  Bazel:      bazel build //:pkg    (hermetic, cacheable)
+Bazel is the only distribution path (RU6). The pnpm scripts stay as local
+conveniences; Bazel owns the hermetic graph and is the proof authority.
 
-Subpackage structure:
-  //src/core         - SchedulingAdapter interface, types, Effect wrappers
-  //src/adapters     - HomegrownAdapter (PostgreSQL/Drizzle)
-  //src/payments     - Stripe, Venmo/PayPal, manual payment adapters
-  //src/onboarding   - Payment provider onboarding (credentials, OAuth, webhooks)
-  //src/capabilities - Scheduling runtime capability contract + resolver
-  //src/components   - 12 Svelte checkout UI components
-  //src/stores       - Svelte stores (checkout state)
-  //src/lib          - Utilities (URL builder, Acuity listener)
-  //src/reconciliation - Alt-payment matching
-  //src/testing      - Mock helpers, MSW handlers
+  Package:    bazel build //:pkg                (svelte-package dist/ + package.json)
+  Tests:      bazel test //:test //:test-component
+  Typecheck:  bazel test //:typecheck           (svelte-check --tsgo on TypeScript 7.0.2,
+                                                 plus a seeded-error canary)
+
+In-house modules (tinyland-calendar, tinyland-caldav-client) are linked from
+their bazel_dep //:pkg targets; package.json carries no in-house specifiers.
 """
 
 load("@aspect_bazel_lib//lib:copy_to_directory.bzl", "copy_to_directory")
-load("@aspect_rules_js//js:defs.bzl", "js_binary", "js_library", "js_run_binary")
-load("@aspect_rules_js//npm:defs.bzl", "npm_package")
-load("@aspect_rules_ts//ts:defs.bzl", "ts_project")
+load("@aspect_rules_js//js:defs.bzl", "js_binary", "js_library", "js_run_binary", "js_test")
+load("@aspect_rules_js//npm:defs.bzl", "npm_link_package", "npm_package")
 load("@tummycrypt_scheduling_kit_npm//:defs.bzl", "npm_link_all_packages")
-load("@tummycrypt_scheduling_kit_npm//:@sveltejs/kit/package_json.bzl", svelte_kit = "bin")
-load("@tummycrypt_scheduling_kit_npm//:svelte-check/package_json.bzl", svelte_check = "bin")
-load("@tummycrypt_scheduling_kit_npm//:@sveltejs/package/package_json.bzl", svelte_package = "bin")
 load("@tummycrypt_scheduling_kit_npm//:vitest/package_json.bzl", vitest_bin = "bin")
 
 # =============================================================================
@@ -34,58 +25,43 @@ load("@tummycrypt_scheduling_kit_npm//:vitest/package_json.bzl", vitest_bin = "b
 
 npm_link_all_packages(name = "node_modules")
 
-svelte_check.svelte_check_binary(
-    name = "svelte_check",
-    visibility = ["//visibility:public"],
+# First-party modules resolved through the Bazel module graph (RU6). The
+# ./recurrence and ./caldav subpaths import them lazily; they are linked here
+# for the declaration build, the type check and the tests. A consumer that
+# uses those subpaths links the same modules next to this package.
+npm_link_package(
+    name = "node_modules/@tummycrypt/tinyland-calendar",
+    src = "@tummycrypt_tinyland_calendar//:pkg",
 )
 
-svelte_package.svelte_package_binary(
-    name = "svelte_package",
-    visibility = ["//visibility:public"],
+npm_link_package(
+    name = "node_modules/@tummycrypt/tinyland-caldav-client",
+    src = "@tummycrypt_tinyland_caldav_client//:pkg",
 )
 
-svelte_kit.svelte_kit_binary(
-    name = "svelte_kit",
-    visibility = ["//visibility:public"],
-)
+INHOUSE_NPM_PACKAGES = [
+    ":node_modules/@tummycrypt/tinyland-caldav-client",
+    ":node_modules/@tummycrypt/tinyland-calendar",
+]
 
 js_binary(
     name = "bazel_svelte_package",
-    entry_point = "scripts/svelte-package-bazel-wrapper.mjs",
     data = [
         ":node_modules/@sveltejs/package",
+        ":node_modules/@sveltejs/vite-plugin-svelte",
         ":node_modules/svelte",
         ":node_modules/typescript",
     ],
-)
-
-# svelte-check and Vitest both read tsconfig.json, which extends the generated
-# .svelte-kit/tsconfig.json. Mirror the pnpm scripts' required sync step.
-js_run_binary(
-    name = "svelte_kit_sync",
-    tags = ["manual"],
-    tool = ":svelte_kit",
-    chdir = ".",
-    srcs = glob([
-        "src/**/*.ts",
-        "src/**/*.svelte",
-        "src/**/*.svelte.ts",
-    ]) + [
-        "package.json",
-        "svelte.config.js",
-        "tsconfig.json",
-        ":node_modules",
-    ],
-    args = ["sync"],
-    out_dirs = [".svelte-kit"],
-    visibility = ["//visibility:public"],
+    entry_point = "scripts/svelte-package-bazel-wrapper.mjs",
 )
 
 # =============================================================================
 # Svelte package build
 #
-# Uses svelte-package to compile all src/ to dist/. This handles .svelte
-# components, .svelte.ts stores, and plain .ts files in one pass.
+# svelte-package compiles src/ to dist/: .svelte components, .svelte.ts
+# stores and plain .ts files in one pass. Its TypeScript transpile and the
+# svelte2tsx declaration emit run in-process on the RU13b companion
+# (.pnpmfile.cjs); there is no SvelteKit sync step.
 # =============================================================================
 
 SCHEDULING_KIT_PACKAGE_SOURCES = glob(
@@ -110,16 +86,13 @@ copy_to_directory(
 
 js_run_binary(
     name = "scheduling_kit_build",
-    tags = ["manual"],
-    tool = ":bazel_svelte_package",
     srcs = [
-        ":scheduling_kit_src",
         "package.json",
         "svelte.config.js",
         "tsconfig.json",
-        ":svelte_kit_sync",
         ":node_modules",
-    ],
+        ":scheduling_kit_src",
+    ] + INHOUSE_NPM_PACKAGES,
     args = [
         "-i",
         "$(execpath :scheduling_kit_src)",
@@ -127,13 +100,13 @@ js_run_binary(
         "dist",
     ],
     out_dirs = ["dist"],
+    tool = ":bazel_svelte_package",
     visibility = ["//visibility:public"],
 )
 
 js_library(
     name = "scheduling_kit",
     srcs = [":scheduling_kit_build"],
-    tags = ["manual"],
     # Runtime dependencies (package.json "dependencies") that consumers do not
     # provide themselves. Declaring them here carries their npm package store
     # infos through //:pkg so Bazel consumers that link this module via
@@ -144,7 +117,8 @@ js_library(
     # and effect values cross the package boundary (e.g. re-exported Errors),
     # so a second linked copy would fork runtime identity (instanceof) and
     # break consumer declaration emit (TS2742) with duplicate type roots.
-    # Peer dependencies are likewise excluded; consumers provide them.
+    # Peer dependencies and the lazily loaded in-house modules are likewise
+    # excluded; consumers provide them.
     deps = [
         ":node_modules/drizzle-orm",
         ":node_modules/zod",
@@ -159,142 +133,14 @@ js_library(
 npm_package(
     name = "pkg",
     srcs = [
-        "package.json",
-        "README.md",
+        "CHANGELOG.md",
         "LICENSE",
+        "README.md",
+        "package.json",
         ":scheduling_kit",
     ],
     package = "@tummycrypt/scheduling-kit",
-    tags = ["manual"],
-    version = "0.12.0",
-    visibility = ["//visibility:public"],
-)
-
-# =============================================================================
-# TypeScript subpackage targets (finer-grained build caching)
-#
-# These compile individual subpackages independently for:
-#   - Incremental builds (only recompile what changed)
-#   - Dependency validation (enforce clean boundaries)
-#   - Parallel compilation
-# =============================================================================
-
-ts_project(
-    name = "core",
-    srcs = glob(["src/core/**/*.ts"], exclude = ["src/core/**/*.test.ts"]),
-    declaration = True,
-    tsconfig = ":tsconfig.json",
-    transpiler = "tsc",
-    validate = False,
-    deps = [
-        ":node_modules",
-        ":node_modules/effect",
-        ":node_modules/zod",
-    ],
-    visibility = ["//visibility:public"],
-)
-
-ts_project(
-    name = "adapters",
-    srcs = glob(["src/adapters/**/*.ts"], exclude = ["src/adapters/**/*.test.ts"]),
-    declaration = True,
-    tsconfig = ":tsconfig.json",
-    transpiler = "tsc",
-    validate = False,
-    deps = [
-        ":core",
-        ":node_modules",
-        ":node_modules/effect",
-        ":node_modules/drizzle-orm",
-    ],
-    visibility = ["//visibility:public"],
-)
-
-ts_project(
-    name = "payments",
-    srcs = glob(["src/payments/**/*.ts"], exclude = ["src/payments/**/*.test.ts"]),
-    declaration = True,
-    tsconfig = ":tsconfig.json",
-    transpiler = "tsc",
-    validate = False,
-    deps = [
-        ":core",
-        ":node_modules",
-        ":node_modules/effect",
-    ],
-    visibility = ["//visibility:public"],
-)
-
-ts_project(
-    name = "capabilities",
-    srcs = glob(["src/capabilities/**/*.ts"], exclude = ["src/capabilities/**/*.test.ts"]),
-    declaration = True,
-    tsconfig = ":tsconfig.json",
-    transpiler = "tsc",
-    validate = False,
-    deps = [
-        ":node_modules",
-    ],
-    visibility = ["//visibility:public"],
-)
-
-ts_project(
-    name = "reconciliation",
-    srcs = glob(["src/reconciliation/**/*.ts"], exclude = ["src/reconciliation/**/*.test.ts"]),
-    declaration = True,
-    tsconfig = ":tsconfig.json",
-    transpiler = "tsc",
-    validate = False,
-    deps = [
-        ":core",
-        ":node_modules",
-        ":node_modules/effect",
-    ],
-    visibility = ["//visibility:public"],
-)
-
-ts_project(
-    name = "lib",
-    srcs = glob(["src/lib/**/*.ts"], exclude = ["src/lib/**/*.test.ts"]),
-    declaration = True,
-    tsconfig = ":tsconfig.json",
-    transpiler = "tsc",
-    validate = False,
-    deps = [
-        ":core",
-        ":node_modules",
-    ],
-    visibility = ["//visibility:public"],
-)
-
-ts_project(
-    name = "testing_lib",
-    srcs = glob(["src/testing/**/*.ts"], exclude = ["src/testing/**/*.test.ts"]),
-    declaration = True,
-    tsconfig = ":tsconfig.json",
-    transpiler = "tsc",
-    validate = False,
-    deps = [
-        ":core",
-        ":node_modules",
-        ":node_modules/effect",
-    ],
-    visibility = ["//visibility:public"],
-)
-
-ts_project(
-    name = "onboarding",
-    srcs = glob(["src/onboarding/**/*.ts"], exclude = ["src/onboarding/**/*.test.ts"]),
-    declaration = True,
-    tsconfig = ":tsconfig.json",
-    transpiler = "tsc",
-    validate = False,
-    deps = [
-        ":core",
-        ":payments",
-        ":node_modules",
-        ":node_modules/effect",
-    ],
+    version = "1.0.0",
     visibility = ["//visibility:public"],
 )
 
@@ -304,84 +150,119 @@ ts_project(
 
 vitest_bin.vitest_test(
     name = "test",
-    tags = ["manual"],
-    data = [
-        ":node_modules",
-        ":svelte_kit_sync",
-        "tsconfig.json",
-        ":node_modules/vitest",
-        "vitest.config.ts",
-    ] + glob([
-        "src/**/*.ts",
-        "src/**/*.svelte",
-        "src/**/*.svelte.ts",
-    ]),
     args = [
         "run",
         "--reporter=verbose",
         "--config",
         "$(rootpath vitest.config.ts)",
     ],
+    data = [
+        "package.json",
+        "svelte.config.js",
+        "tsconfig.json",
+        "vitest.config.ts",
+        ":node_modules",
+        ":node_modules/vitest",
+    ] + INHOUSE_NPM_PACKAGES + glob([
+        "src/**/*.ts",
+        "src/**/*.svelte",
+        "src/**/*.svelte.ts",
+        "src/**/*.json",
+    ]),
     log_level = "info",
     visibility = ["//visibility:public"],
 )
 
-# The existing rendered-component suite exercises the actual Svelte callbacks.
+# The rendered-component suite exercises the actual Svelte callbacks.
 # Keep it graph-addressable; script-only component results are not Bazel proof.
-# This target must be selected by an admitted GF invocation, never run on Neo.
 vitest_bin.vitest_test(
     name = "test-component",
-    tags = ["manual"],
-    data = [
-        ":node_modules",
-        ":svelte_kit_sync",
-        "package.json",
-        "svelte.config.js",
-        "tsconfig.json",
-        "vitest.component.config.ts",
-    ] + glob([
-        "src/**/*.ts",
-        "src/**/*.svelte",
-        "tests/e2e/**/*.ts",
-    ]),
     args = [
         "run",
         "--reporter=verbose",
         "--config",
         "$(rootpath vitest.component.config.ts)",
     ],
+    data = [
+        "package.json",
+        "svelte.config.js",
+        "tsconfig.json",
+        "vitest.component.config.ts",
+        ":node_modules",
+    ] + INHOUSE_NPM_PACKAGES + glob([
+        "src/**/*.ts",
+        "src/**/*.svelte",
+        "src/**/*.json",
+        "tests/e2e/**/*.ts",
+    ]),
     log_level = "info",
     visibility = ["//visibility:public"],
 )
 
 # =============================================================================
-# Typecheck (svelte-check)
+# Typecheck (RU13: svelte-check --tsgo on TypeScript 7.0.2)
+#
+# svelte-check runs in its TypeScript 7 native mode, so TypeScript 7.0.2 checks
+# every .svelte and .ts file tsconfig.json includes. --tsgo writes its emit
+# directory, so the runner checks a writable scratch copy of this declared tree.
 # =============================================================================
 
-js_run_binary(
-    name = "typecheck",
-    tags = ["manual"],
-    tool = ":svelte_check",
-    chdir = ".",
-    srcs = glob(
+copy_to_directory(
+    name = "check_workspace",
+    srcs = [
+        "package.json",
+        "svelte.config.js",
+        "tsconfig.json",
+    ] + glob(
         [
             "src/**/*.ts",
             "src/**/*.svelte",
             "src/**/*.svelte.ts",
+            "src/**/*.json",
         ],
-        allow_empty = True,
-    ) + [
-        "svelte.config.js",
-        "tsconfig.json",
-        ":svelte_kit_sync",
-        ":node_modules",
-    ],
+    ),
+    hardlink = "off",
+    root_paths = ["."],
+)
+
+TYPECHECK_DATA = [
+    ":check_workspace",
+    ":node_modules",
+] + INHOUSE_NPM_PACKAGES
+
+js_test(
+    name = "svelte_check_test",
     args = [
-        "--tsconfig",
-        "$(rootpath tsconfig.json)",
+        "--workspace",
+        "$(rootpath :check_workspace)",
     ],
-    stdout = "typecheck.log",
-    visibility = ["//visibility:public"],
+    data = TYPECHECK_DATA,
+    entry_point = "scripts/bazel/run-svelte-check.mjs",
+    timeout = "moderate",
+)
+
+# Seeded-error canary for the gate above: a .ts and a .svelte type error are
+# written into the scratch copy and the test fails unless svelte-check --tsgo
+# reports both. Under --tsgo a tsconfig that checks nothing reports 0 errors
+# (sveltejs/language-tools#3136).
+js_test(
+    name = "svelte_check_canary_test",
+    args = [
+        "--workspace",
+        "$(rootpath :check_workspace)",
+        "--canary",
+    ],
+    data = TYPECHECK_DATA,
+    entry_point = "scripts/bazel/run-svelte-check.mjs",
+    timeout = "moderate",
+)
+
+test_suite(
+    name = "typecheck",
+    tests = [
+        ":svelte_check_canary_test",
+        ":svelte_check_test",
+    ],
 )
 
 # =============================================================================

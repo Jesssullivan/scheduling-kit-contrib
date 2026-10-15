@@ -124,9 +124,11 @@ export class RecurrencePeerUnavailableError extends Error {
     const message = cause instanceof Error ? cause.message : String(cause);
     super(
       'expandRecurrence requires the optional peer dependency ' +
-        '@tummycrypt/tinyland-calendar (^0.2.3). Install it alongside ' +
+        '@tummycrypt/tinyland-calendar (>= 1.0.0). Link it alongside ' +
         '@tummycrypt/scheduling-kit to use the ./recurrence subpath ' +
-        `(e.g. \`pnpm add @tummycrypt/tinyland-calendar\`). Cause: ${message}`,
+        '(Bazel only: `bazel_dep(name = "tummycrypt_tinyland_calendar")` plus ' +
+        '`npm_link_package(name = "node_modules/@tummycrypt/tinyland-calendar", ' +
+        `src = "@tummycrypt_tinyland_calendar//:pkg")\`). Cause: ${message}`,
     );
     this.name = 'RecurrencePeerUnavailableError';
   }

@@ -3,9 +3,16 @@
  * Configures jsdom environment for @testing-library/svelte tests
  */
 
-import { vi, beforeAll, afterEach } from 'vitest';
-import '@testing-library/jest-dom/vitest';
+import { vi, beforeAll, afterEach, expect } from 'vitest';
+// Register the jest-dom matchers on this file's own `vitest` instance. The
+// '@testing-library/jest-dom/vitest' side-effect entry imports `vitest` from
+// jest-dom's location; under Bazel's symlinked node_modules that can resolve to
+// a second vitest module instance, leaving the test's `expect` unextended.
+import * as jestDomMatchers from '@testing-library/jest-dom/matchers';
+import type {} from '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/svelte';
+
+expect.extend(jestDomMatchers);
 
 // Clean up after each test
 afterEach(() => {

@@ -4,10 +4,14 @@ Backend-agnostic scheduling library with Svelte 5 components, pluggable
 scheduling adapters, alternative payment support, and Effect-powered workflow
 composition.
 
-This repo keeps two intentionally different build surfaces:
+Bazel is the only distribution path (RU6): the module is published to
+xoxd-ai/bazel-registry and consumed with `bazel_dep`. Nothing is published to
+npmjs or GitHub Packages. `pnpm` stays as the local script interface; Bazel
+builds, tests and type-checks the artifact and is the proof authority.
 
-- `pnpm` is the local package-manager and script interface
-- Bazel defines and builds the JavaScript package artifact validated by CI
+Stack (1.0.0): Svelte 5.57.2, TypeScript 7.0.2, Vite 8.3.3, Vitest 5.0.3,
+Effect 4.0.2, Skeleton 5.0.1. See [CHANGELOG.md](./CHANGELOG.md) for the 1.0.0
+migration note.
 
 The recommended local bootstrap path is the repo flake plus `direnv`, which
 makes `pnpm`, `bazel` through Bazelisk, and the docs toolchain available from a
@@ -28,24 +32,36 @@ clean shell.
 
 ## Installation
 
-The Bazel module graph is the canonical delivery mechanism. Depend on the
-module through the tinyland Bazel registry:
+Depend on the module through the xoxd-ai Bazel registry and link the package
+into your `node_modules`:
 
 ```starlark
-bazel_dep(name = "tummycrypt_scheduling_kit", version = "0.11.1")
+# MODULE.bazel
+bazel_dep(name = "tummycrypt_scheduling_kit", version = "1.0.0")
+
+# BUILD.bazel
+npm_link_package(
+    name = "node_modules/@tummycrypt/scheduling-kit",
+    src = "@tummycrypt_scheduling_kit//:pkg",
+)
 ```
 
-with the registry line (already in this repo's `.bazelrc`):
+with the registry line (this repo's `.bazelrc` pins a registry commit):
 
 ```text
-common --registry=https://raw.githubusercontent.com/tinyland-inc/bazel-registry/main
+common --registry=https://raw.githubusercontent.com/xoxd-ai/bazel-registry/main
 ```
 
-The append-only registry receipt carrying `0.11.1` and its GF consumer proof is
-`cfbb16e6ae957da9e8a25b7418a7871ec815e0a1`. The
-`@tummycrypt/scheduling-kit` string remains the JavaScript import identity inside
-the Bazel artifact; it is not a provider install route. There is no supported
-npmjs or GitHub Packages consumer alias for current releases.
+`@tummycrypt/scheduling-kit` is the JavaScript import identity inside the Bazel
+artifact, not an npm install route. `drizzle-orm` and `zod` travel with `//:pkg`;
+`effect` (exactly 4.0.2) and `svelte` (exactly 5.57.2) come from the consumer.
+
+The `./recurrence`, `./caldav` and `./availability` subpaths load
+`@tummycrypt/tinyland-calendar` and `@tummycrypt/tinyland-caldav-client` lazily.
+Consumers that use them add `bazel_dep`s on `tummycrypt_tinyland_calendar`
+(>= 1.0.0) and `tummycrypt_tinyland_caldav_client` (>= 1.0.1) and link each
+module's `//:pkg` the same way. The legacy HomegrownAdapter schema fallback loads
+`@tummycrypt/tinyland-auth-pg` the same way; pass `schemas` to avoid it.
 
 ## Development Environment
 
@@ -58,18 +74,17 @@ If `bazel` is missing in your current shell, enter the flake environment with
 `nix develop` or let `direnv` load `.envrc`. The dev shell provides a `bazel`
 wrapper backed by Bazelisk and pinned by `.bazelversion`.
 
-Peer dependencies (install those you need):
+Bazel is the authority for type checks and tests, because the in-house
+modules resolve only through the Bazel module graph:
 
 ```bash
-# Required
-pnpm add svelte
-
-# Optional -- for UI components
-pnpm add @skeletonlabs/skeleton@5.0.1 @skeletonlabs/skeleton-svelte@5.0.1
-
-# Optional -- for E2E tests
-pnpm add -D playwright-core
+bazel build //:pkg
+bazel test //...          # unit, component, svelte-check --tsgo + canary
 ```
+
+Standalone `pnpm check` and `pnpm test:unit` report the missing in-house
+modules (3 svelte-check errors; the recurrence/availability/CalDAV suites fail)
+by design.
 
 ## Release Hygiene
 
@@ -77,12 +92,13 @@ pnpm add -D playwright-core
 pnpm check:release-metadata
 pnpm check:package
 bazel build //:pkg
-npm pack --dry-run ./bazel-bin/pkg
+npx publint@0.3.25 ./bazel-bin/pkg
 ```
 
 Those checks keep `package.json`, `MODULE.bazel`, and `BUILD.bazel` artifact
-identity aligned. GF runs the same validation against the Bazel-built artifact;
-delivery is the separately reviewed append-only BCR entry.
+identity aligned. A release is a signed git tag, a GitHub release, and a
+xoxd-ai/bazel-registry entry whose integrity is computed from the real tag
+archive.
 
 ## Documentation
 
@@ -96,19 +112,10 @@ nix flake check         # Evaluate flake outputs and run lightweight checks
 
 ## Release Authority
 
-Current reality:
-
-- the functional source and tag line is `Jesssullivan/scheduling-kit`
-- `tinyland-inc/scheduling-kit` is now a downstream mirror and validation
-  surface, not a second release authority
-- source commit, tag, and GitHub Release `v0.11.1` resolve to
-  `9a00ee387afe1759ebba0c0a67e9246d84b1aa37`
-- the Tinyland Bazel registry carries `tummycrypt_scheduling_kit@0.11.1`; its
-  append-only proof receipt is `cfbb16e6ae957da9e8a25b7418a7871ec815e0a1`
-
-Treat `Jesssullivan/main` as the source authority for release metadata changes.
-Treat `tinyland-inc/bazel-registry` as delivery authority. Do not assume the two
-scheduling-kit `main` branches are equivalent.
+- Source and tags: `xoxd-ai/scheduling-kit` (`Jesssullivan/scheduling-kit`
+  redirects here).
+- Delivery: `xoxd-ai/bazel-registry` module `tummycrypt_scheduling_kit`.
+- npmjs and GitHub Packages are historical surfaces only (RU8).
 
 The delivery doctrine is:
 
@@ -116,11 +123,10 @@ The delivery doctrine is:
 2. Bazel defines and builds the JavaScript artifact
 3. GF GitHub Actions validates that artifact without provider credentials or
    write permissions
-4. the source tag and GitHub Release identify the immutable archive
-5. the Bzlmod module graph via `tinyland-inc/bazel-registry` is the sole
-   delivery mechanism
+4. the signed source tag and GitHub Release identify the immutable archive
+5. the Bzlmod module graph via `xoxd-ai/bazel-registry` is the sole delivery
+   mechanism
 6. downstream apps consume the ruled Bzlmod version
-7. npmjs and GitHub Packages remain historical surfaces only
 
 ## Runner Authority
 
@@ -402,11 +408,12 @@ import { CassetteRecorder, CassettePlayer } from '@tummycrypt/scheduling-kit/tes
 ```bash
 pnpm dev                 # Start dev server
 pnpm build               # Build package
-pnpm check               # TypeScript check
+pnpm check               # svelte-check --tsgo (TypeScript 7.0.2)
 pnpm lint                # ESLint
 pnpm test:all            # Run all test suites
 pnpm docs:check          # Validate generated docs and MkDocs config
-bazel build //:pkg       # Build npm artifact through Bazel
+bazel build //:pkg       # Build the package artifact through Bazel
+bazel test //...         # Bazel proof: tests + type check
 ```
 
 ## License
