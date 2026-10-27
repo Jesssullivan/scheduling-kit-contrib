@@ -55,19 +55,29 @@ Package delivery follows one source of truth:
 
 ## Bazel Cache Contract
 
-Local Bazel use defaults to the repo-local disk cache in `.bazelrc`:
+Local Bazel use defaults to the repo-local disk cache in `.bazelrc`. A local
+run is local, non-qualifying: it is a developer diagnostic, not GF validation
+evidence. `just flywheel-build` and `just flywheel-test` with `FLYWHEEL` unset
+or `0` print that label and run:
 
 ```bash
-bazel build //:pkg
+bazel build //:typecheck //:pkg //:test
 bazel test //:test
 ```
 
+`.bazelrc` bounds the local client server with `startup --max_idle_secs=120`
+and sets `build --remote_local_fallback=false`, so a remote lane fails
+instead of falling back to local execution (TIN-5770). `FLYWHEEL=1` is the
+cache-backed lane. It needs `BAZEL_REMOTE_CACHE` and passes
+`scripts/cache-attachment-contract.sh --strict` first.
+
 Contributor machines can opt into a remote cache by adding a private
 `user.bazelrc`; this repository intentionally keeps private cache topology out
-of public source. CI remote-cache behavior is owned by the shared
-`js-bazel-package` workflow and its GF runner environment. The public contract
-is that CI validates and archives the Bazel package artifact from
-`./bazel-bin/pkg`; it does not publish that artifact to a package provider.
+of public source. Such a cache stays read-only
+(`--remote_upload_local_results=false`). CI remote-cache behavior is owned by
+the shared `js-bazel-package` workflow and its GF runner environment. The
+public contract is that CI validates and archives the Bazel package artifact
+from `./bazel-bin/pkg`; it does not publish that artifact to a package provider.
 
 ## Core commands
 

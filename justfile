@@ -11,9 +11,9 @@
 
 # FLYWHEEL gates the cache-backed lane. When FLYWHEEL=1 the build/test recipes
 # attach to the shared cache (--config=ci-cached --remote_cache=$BAZEL_REMOTE_CACHE,
-# read-only). When unset/0 they run the plain local Bazel path (byte-identical to
-# the non-opted default), so contributors without cluster cache reachability are
-# never blocked.
+# read-only). When unset/0 they run the plain local Bazel path, labelled
+# "local, non-qualifying", so contributors without cluster cache reachability are
+# never blocked (TIN-5770, R471).
 FLYWHEEL := env_var_or_default("FLYWHEEL", "0")
 BAZEL_REMOTE_CACHE := env_var_or_default("BAZEL_REMOTE_CACHE", "")
 BAZEL_TARGETS := "//:typecheck //:pkg //:test"
@@ -50,6 +50,7 @@ flywheel-build:
 			--remote_upload_local_results=false \
 			--verbose_failures
 	else
+		echo "flywheel-build: local, non-qualifying (FLYWHEEL=0, no shared cache)" >&2
 		bazel build {{BAZEL_TARGETS}} --verbose_failures
 	fi
 
@@ -66,5 +67,6 @@ flywheel-test:
 			--remote_upload_local_results=false \
 			--verbose_failures
 	else
+		echo "flywheel-test: local, non-qualifying (FLYWHEEL=0, no shared cache)" >&2
 		bazel test //:test --verbose_failures
 	fi
